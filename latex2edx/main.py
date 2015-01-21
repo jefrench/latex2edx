@@ -1210,29 +1210,71 @@ class latex2edx(object):
     @staticmethod
     def process_showhide(tree):
         for showhide in tree.findall('.//edxshowhide'):
-            shid = showhide.get('id')
-            if shid is None:
-                print "Error: edXshowhide must be given an id argument.  Aborting."
-                raise Exception
-            print "---> showhide %s" % shid
-            # jscmd = "javascript:toggleDisplay('%s', 'hide', 'show')" % shid
-            jscmd = "javascript:$('#%s').toggle();" % shid
-
-            shtable = etree.Element('table')
-            showhide.addnext(shtable)
-
-            desc = showhide.get('description', '')
-            shtable.set('class', "wikitable collapsible collapsed")
-            shdiv = etree.XML('<tbody><tr><th> %s [<a onclick="%s" href="javascript:void(0);" id="%sl">show</a>]</th></tr></tbody>' % (desc, jscmd, shid))
-            shtable.append(shdiv)
-
-            tr = etree.SubElement(shdiv, 'tr')
-            tr.set('id', shid)
-            tr.set('style', 'display:none')
-            tr.append(showhide)	 # move showhide to become td of table
-            showhide.tag = 'td'
-            showhide.attrib.pop('id')
+            #remove_outside_p(showhide)
+            desc = showhide.get('description','')
+            oneup=showhide.getparent()
+            newsh = etree.SubElement(oneup,'div')
+            newsh.set('class','hideshowbox')
+            sub1 = etree.SubElement(newsh,'h4')
+            sub1.set('onclick',"hideshow(this);")
+            sub1.text = desc
+            subsub1 = etree.SubElement(sub1,'img')
+            subsub1.set('src',"/static/js/down.png")
+            subsub1.set('class',"toggleimage")
+            newsh.append(showhide)
+            showhide.tag = 'div'
+            #showhide.attrib.pop('id')  #can remove this if id removed from showhide elements in plastex
             showhide.attrib.pop('description')
+            showhide.set('class','hideshowcontent')
+            sub2 = etree.SubElement(newsh,'p')
+            sub2.set('class','hideshowbottom')
+            sub2.set('onclick',"hideshow(this);")
+            subsub2 = etree.SubElement(sub2,'a')
+            subsub2.set('href',"javascript: {return false;}")
+            subsub2.text='Show'
+            par = newsh.getparent()
+            while (par.tag != 'html') and (par.tag != 'problem'):
+                par = par.getparent()
+                if par.tag == 'vertical' or par.tag == 'sequential':
+                    raise Exception("Muse use showhide inside html or problem element")
+                    break
+            scriptforsh = etree.Element('SCRIPT')
+            scriptforsh.set('type','text/javascript')
+            scriptforsh.set('src','/static/js/showhidescript.js')
+            if len(par.findall('.//SCRIPT'))!= 0:
+                scriptcount = 0
+                for script in par.findall('.//SCRIPT'):
+                    if script.get('src','') == scriptforsh.get('src',''):
+                        scriptcount += 1
+                if scriptcount ==0:
+                    par.append(scriptforsh)
+            else:
+                par.append(scriptforsh)
+    # def process_showhide(tree):
+    #     for showhide in tree.findall('.//edxshowhide'):
+    #         shid = showhide.get('id')
+    #         if shid is None:
+    #             print "Error: edXshowhide must be given an id argument.  Aborting."
+    #             raise Exception
+    #         print "---> showhide %s" % shid
+    #         # jscmd = "javascript:toggleDisplay('%s', 'hide', 'show')" % shid
+    #         jscmd = "javascript:$('#%s').toggle();" % shid
+
+    #         shtable = etree.Element('table')
+    #         showhide.addnext(shtable)
+
+    #         desc = showhide.get('description', '')
+    #         shtable.set('class', "wikitable collapsible collapsed")
+    #         shdiv = etree.XML('<tbody><tr><th> %s [<a onclick="%s" href="javascript:void(0);" id="%sl">show</a>]</th></tr></tbody>' % (desc, jscmd, shid))
+    #         shtable.append(shdiv)
+
+    #         tr = etree.SubElement(shdiv, 'tr')
+    #         tr.set('id', shid)
+    #         tr.set('style', 'display:none')
+    #         tr.append(showhide)	 # move showhide to become td of table
+    #         showhide.tag = 'td'
+    #         showhide.attrib.pop('id')
+    #         showhide.attrib.pop('description')
 
     def process_include(self, tree, do_python=False):
         '''

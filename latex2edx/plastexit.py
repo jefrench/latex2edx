@@ -127,7 +127,7 @@ class MyRenderer(XHTML.Renderer):
                 os.system(cmd)
                 print cmd
                 os.system('chmod og+r %s' % wwwfn)
-            return '<img src="/static/%s/%s" width="%d" />' % (self.imurl,fnbase,width)
+            return  '<img src="/static/%s/%s" width="%d" />' % (self.imurl,fnbase,width)
 
         fnset = [m.group(2)]
         fnsuftab = ['','.png','.pdf','.png','.jpg']
@@ -149,6 +149,7 @@ class MyRenderer(XHTML.Renderer):
                             print "--> %d page PDF, fnset=%s (nfound=%d)" % (npages, fnset, nfound)
                         if not nfound==npages:
                             os.system('convert -density 800 {fn}.pdf -scale {dim}x{dim} {fn}.png'.format(fn=fn,dim=dim))
+                        #    os.system('sips -s format png %s.pdf --out %s.png' % (fn, fn))
                         if npages>1:	# handle multi-page PDFs
                             fnset = ['%s-%d' % (fn,x) for x in range(npages)]
                             print "--> %d page PDF, fnset=%s" % (npages, fnset)

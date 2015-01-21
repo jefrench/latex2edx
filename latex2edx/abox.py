@@ -177,6 +177,7 @@ class AnswerBox(object):
                           'symbolic': 'symbolicresponse',
                           'image': 'imageresponse',
                           'jsinput': 'customresponse_jsinput',
+                          'draganddrop': 'customresponse_dnd'
                           }
 
         if 'type' in abargs and abargs['type'] in type2response:
@@ -341,6 +342,41 @@ class AnswerBox(object):
             for jsa in jsattribs:
                 self.copy_attrib(abargs, jsa, js)
             abxml.append(js)
+
+        elif abtype=='customresponse_dnd':
+            abxml.tag = 'customresponse'
+            self.require_args(['backgroundimg'])
+            dndinput = etree.SubElement(abxml,'drag_and_drop_input')
+            dndinput.set('img',abargs['backgroundimg']) 
+            dndinput.set('target_outline','false')
+            #dndinput.set('target_outline','true')    
+            draggablestr, draggables = self.get_draggables(abargs)
+            cnt = 0       
+            for ds in draggables:
+                cnt += 1
+                draggable = etree.SubElement(dndinput,'draggable')
+                draggable.set('id',"fig%d" % cnt)
+                draggable.set('icon',ds)
+                #draggable.set('can_reuse',"false")
+                draggable.set('can_reuse',"true")
+               
+            targetstr, targets = self.get_targets(abargs)
+            cnt = 0
+            for ts in targets:
+                cnt += 1
+                target = etree.SubElement(dndinput,'target')
+                target.set('id',"target%d" % cnt)
+                print "ts=",ts
+                quadruplet = re.sub(r'\(',r'',ts)
+                quadruplet = re.sub(r'\)',r'',quadruplet)
+                x,y,w,h = quadruplet.split(r',')
+                target.set('x', x)
+                target.set('y', y)
+                target.set('w', w)
+                target.set('h', h)     
+            answer = etree.SubElement(abxml,'answer')
+            answer.set('type',"loncapa/python")       
+            answer.text = self.get_answer(abargs)
                     
         elif abtype=='externalresponse' or abtype== 'coderesponse':
             if 'url' in abargs:
@@ -466,6 +502,49 @@ class AnswerBox(object):
         optionstr = ','.join(["'%s'" % x for x in options])	# string of single quoted strings
         optionstr = "(%s)" % optionstr				# enclose in parens
         return optionstr, options
+
+    def get_draggables(self,abargs,arg='draggables'):
+        #Taken from Chad's abox
+        dragstr = abargs[arg]           # should be double quoted strings, comma delimited
+        #options = [c for c in csv.reader([optstr])][0] # turn into list of strings
+        draggables = split_args_with_quoted_strings(dragstr, lambda(x): x==',')     # turn into list of strings
+        draggables = map(self.stripquotes, draggables)
+        draggables = [x.strip() for x in draggables]        # strip strings
+        if "" in draggables: draggables.remove("")
+        draggablestr = ','.join(["'%s'" % x for x in draggables])   # string of single quoted strings
+        draggablestr = "(%s)" % draggablestr                # enclose in parens
+        return draggablestr, draggables
+
+    def get_targets(self,abargs,arg='targets'):
+        """
+        Taken from Chad's abox
+        """
+        targetstr = abargs[arg]         # should be double quoted strings, comma delimited
+        #options = [c for c in csv.reader([optstr])][0] # turn into list of strings
+        targets = split_args_with_quoted_strings(targetstr, lambda(x): x==',')      # turn into list of strings
+        targets = map(self.stripquotes, targets)
+        targets = [x.strip() for x in targets]      # strip strings
+        if "" in targets: targets.remove("")
+        targetstr = ','.join(["'%s'" % x for x in targets]) # string of single quoted strings
+        targetstr = "(%s)" % targetstr              # enclose in parens
+        return targetstr, targets
+        
+    def get_answer(self,abargs,arg='answer'):
+        """
+        Take answer dictionary, and turn into custom function needed to grade correctly.
+        This script only works for exact rule answer types.
+        To Do: Add functionality for other answer types
+        """
+        answerstr = abargs[arg] #should be a list of dictionaries between round brackets, comma delimited
+        answerstr = answerstr.replace('(','{')
+        answerstr = answerstr.replace(')','}')
+        anslist = eval(answerstr)
+        ansdict=[{"draggables":ca.keys(),"targets":ca.values(),"rule":"exact"} for ca in anslist]
+        cfncode =('if draganddrop.grade(submission[0], correct_answer):\n'
+                      '    correct = ["correct"]\n'
+                      'else:\n'
+                      '    correct = ["incorrect"]\n')
+        return "\ncorrect_answer= %s \n" %repr(ansdict) + cfncode
     
     def require_args(self,argnames):
         for argname in argnames:
