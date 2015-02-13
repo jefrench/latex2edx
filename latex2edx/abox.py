@@ -208,14 +208,10 @@ class AnswerBox(object):
             cg = etree.SubElement(abxml,'choicegroup')
             cg.set('direction','vertical')
             optionstr, options = self.get_options(abargs)
-
             # if expect has multiple comma-delimited quoted strings, then use "checkboxgroup"
             # and "choiceresponse" instead, and allow for multiple possible valid answers
             expectstr, expectset = self.get_options(abargs, arg='expect')
-            if len(expectset)>1:
-                cg.tag = 'checkboxgroup'
-                abxml.tag = 'choiceresponse'
-            else:
+            if len(expectset)==1:
                 expect = self.stripquotes(abargs['expect'])
                 expectset = [expect]
             cnt = 1
