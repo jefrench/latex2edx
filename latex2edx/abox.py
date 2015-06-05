@@ -270,8 +270,9 @@ class AnswerBox(object):
             self.copy_attrib(abargs,'inline',abxml)
 
         elif abtype=='customresponse':
-            self.require_args(['expect','cfn'])
-            abxml.set('cfn',self.stripquotes(abargs['cfn']))
+            self.require_args(['expect'])
+            if abargs.get('cfn'):
+                abxml.set('cfn',self.stripquotes(abargs['cfn']))
             self.copy_attrib(abargs,'inline',abxml)
             self.copy_attrib(abargs,'expect',abxml)
             self.copy_attrib(abargs,'options',abxml)
@@ -382,19 +383,22 @@ class AnswerBox(object):
         elif abtype=='numericalresponse':
             self.require_args(['expect'])
             self.copy_attrib(abargs,'inline',abxml)
-            tl = etree.Element('textline')
+            if abargs.get('feqin'):
+                tl = etree.Element('formulaequationinput')
+            else:
+                tl = etree.Element('textline')
             self.copy_attrib(abargs,'size',tl)
             self.copy_attrib(abargs,'inline',tl)
             self.copy_attrib(abargs,'math',tl)
             abxml.append(tl)
             self.copy_attrib(abargs,'options',abxml)
             answer = self.stripquotes(abargs['expect'])
-            try:
-                x = float(answer)
-            except Exception as err:
-                if not answer[0]=='$':	# may also be a string variable (starts with $)
-                    print "Error - numericalresponse expects numerical expect value, for %s" % s
-                    raise
+            # try:
+            #     x = float(answer)
+            # except Exception as err:
+            #     if not answer[0]=='$':	# may also be a string variable (starts with $)
+            #         print "Error - numericalresponse expects numerical expect value, for %s" % s
+            #         raise
             abxml.set('answer',answer)
             rp = etree.SubElement(tl,"responseparam")
             #rp.attrib['description'] = "Numerical Tolerance" #not needed
