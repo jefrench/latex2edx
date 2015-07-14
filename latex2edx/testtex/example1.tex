@@ -4,22 +4,28 @@
 
 \documentclass[12pt]{article}
 
-\usepackage{edXpsl}	% edX
+\usepackage{edXpsl}% edX
+\usepackage{amsmath, amsthm, amsfonts, amssymb, color, mathrsfs, comment}
+\usepackage{cancel}
+
+%------------------------------------------
+\parindent=0pt
+\parskip=1ex	% edX
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 \begin{document}
 
-\begin{edXcourse}{1.00x}{1.00x Fall 2013}[url_name=2013_Fall]
+\input{1801macros_edX.tex}
+
+\begin{edXcourse}{0.00x}{Testing Course}[url_name=2020_Fall]
 
 \begin{edXchapter}{Unit 1}[start="2013-11-22"]
 
-\begin{edXsection}{Introduction}[due="2013-11-22"]
+\beginedxsequential{Introduction}{}
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-\begin{edXproblem}{Problem 1}{attempts=40 url_name="p1"}
+\beginedxproblem{Problem 1}{attempts=40 url_name="p1"}
 
-\section{Example of symbolic response}  
- 
 This is a sample problem, which is worth 40 points.  What is the number made famous by
 Hitchhiker's guide to the galaxy?
 
