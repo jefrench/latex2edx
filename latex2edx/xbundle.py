@@ -1,4 +1,4 @@
-#!/usr/bin/python
+#!/usr/bin/env python
 #
 # XBundle class
 #
@@ -177,14 +177,6 @@ class XBundle(object):
         '''add a policies XML subtree to the metadata'''
         self.metadata.append(policies)
 
-    
-    def set_about(self, about):
-        '''set about XML tree'''
-        xabout = self.metadata.find('about')
-        if xbout is not None:
-            self.metadata.remove(xabout)
-        self.metadata.append(xabout)
-
 
     def add_about_file(self, filename, filedata):
         '''add a file to the about element'''
@@ -193,8 +185,9 @@ class XBundle(object):
             about = etree.SubElement(self.metadata,'about')
         abfile = etree.SubElement(about, 'file')
         abfile.set('filename',filename)
-        abfile.text = filedata
-
+        # Unicode characters in the "about" HTML file were causing
+        # the lxml package to break.
+        abfile.text = filedata.decode('utf-8')
 
     #----------------------------------------
     # load/save 
