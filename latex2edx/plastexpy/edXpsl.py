@@ -100,6 +100,8 @@ class edXvertical(EdXverticalStar):
         self.position = self.ownerDocument.context.counters[self.counter].value + 1
         return MyBaseEnvironment.invoke(self, tex)
 
+class edXrandomize(Base.Environment):  # block of text to be hidden by default, but with clickable "show"
+    args = 'self'
 
 class edXabox(MyBaseCommand):
     args = 'self'

@@ -10,13 +10,13 @@
 # 13-Oct-12 ichuang: remove csv entirely, use FSM for splitting options instead
 # 20-Jan-13 ichuang: add formularesponse
 # 23-Jan-13 ichuang: add multiple-line customresponse, with proper inline and math handling
+from __future__ import division
 
 import os, sys, string, re
 # import shlex	# for split keeping quoted strings intact
 # import csv	# for splitting quoted options
-
 from lxml import etree
-
+from sympy import sympify
 
 class AnswerBox(object):
     def __init__(self, aboxstr, context=None, verbose=False):
@@ -398,12 +398,12 @@ class AnswerBox(object):
             abxml.append(tl)
             self.copy_attrib(abargs, 'options', abxml)
             answer = self.stripquotes(abargs['expect'])
-            # try:
-            #     x = float(answer)
-            # except Exception as err:
-            #     if not answer[0]=='$':	# may also be a string variable (starts with $)
-            #         print "Error - numericalresponse expects numerical expect value, for %s" % s
-            #         raise
+            try:
+                x = float(sympify(answer))
+            except Exception as err:
+                if not answer[0]=='$':	# may also be a string variable (starts with $)
+                    print "Error - numericalresponse expects numerical expect value, for %s" % s
+                    raise
             abxml.set('answer',answer)
             rp = etree.SubElement(tl,"responseparam")
             #rp.attrib['description'] = "Numerical Tolerance" #not needed
@@ -424,7 +424,7 @@ class AnswerBox(object):
                 tl = etree.Element('formulaequationinput')
             else:
                 tl = etree.Element('textline')
-                self.copy_attrib(abargs, 'trailing_text', tl)
+            self.copy_attrib(abargs, 'trailing_text', tl)
             self.copy_attrib(abargs, 'size', tl)
             self.copy_attrib(abargs, 'inline', tl)
             self.copy_attrib(abargs, 'math', tl)

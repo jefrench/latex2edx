@@ -378,6 +378,7 @@ class plastex2xhtml(object):
                            'edXtext',
                            'edXproblem',
                            'edXsolution',
+                           'edXrandomize'
                            ]
 
         newstring = []
