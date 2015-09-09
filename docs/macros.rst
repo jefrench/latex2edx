@@ -46,18 +46,20 @@ within it.  In addition, the course itself is defined with certain properties.
 
 These are the structural macros defined for use in latex2edx:
 
-============= =========== ============================================================
-Macro Name    Type        Arguments
-============= =========== ============================================================
-edXcourse     Environment { course_number } { display_name } [ attributes ]
-edXchapter    Environment { display_name } [ attributes ]
-edXsection    Environment { display_name } [ attributes ]
-edXsequential Environment { display_name } [ attributes ]
-edXvertical   Environment { display_name } [ attributes ]
-============= =========== ============================================================
+============== =========== ============================================================
+Macro Name     Type        Arguments
+============== =========== ============================================================
+edXcourse      Environment { course_number } { display_name } [ attributes ]
+edXchapter     Environment { display_name } [ attributes ]
+edXsection     Environment { display_name } [ attributes ]
+edXsequential  Environment { display_name } [ attributes ]
+edXvertical    Environment { display_name } [ attributes ]
+edXconditional Environment { display_name } [ attributes ]
+============== =========== ============================================================
 
-The last four macros also exist in starred versions (e.g. ``edXchapter*``),
-which in agreement with standard LaTeX notation stand for unnumbered sections.
+The edXchapter, edXsection, edXsequential, and edXvertical macros also
+exist in starred versions (e.g. ``edXchapter*``), which in agreement
+with standard LaTeX notation stand for unnumbered sections.
 
 Each of these macros may have optional "attributes" defined, which
 specify content metadata.  Each "attributes" string should be a
@@ -158,6 +160,22 @@ problem elements together, such that they are displayed as one
 vertical unit, when using the edX platform to render edX course
 content.
 
+edXconditional
+^^^^^^^^^^^^^^
+
+Eample::
+
+    \begin{edXconditional}{Concept Question 1 - Explanation}[sources=i4x://MITx/8.421.1x/problem/problem_Concept_Question_1 attempted=True message="Please do Concept Question 1 first, then refresh the page to show this explanation."]
+
+      \edXvideo{Concept Question 1: Video Explanation}{SomeYTID}
+
+    \end{edXconditional}
+
+A conditional element displays its contents only when certain
+conditions are satisfied.  The "attempted", "submitted", and "correct" conditions apply to CAPA
+problems.  "poll_answer" and "voted" apply to poll_questions.
+
+
 Content Macros
 --------------
 
@@ -167,6 +185,7 @@ Macro Name    Type        Arguments
 edXproblem    Environment { display_name }{ attributes }
 edXtext       Environment { display_name } [ attributes ]
 edXvideo      Command     { display_name } { youtube_id } [ attrib_string ] 
+edXlti        Command     { display_name } { launch_url } { lti_id } [ attrib_string ] 
 edXdiscussion Command     { topic_name } [ attrib_string ] 
 ============= =========== ============================================================
 
@@ -255,10 +274,51 @@ for the example above. With a "Download video" button linking to
 ``https://s3.amazonaws.com/edx-course/video/mit-xxx/MITxxxTxxx-Gxxxx.mp4`` 
 specified by the optional ``source`` attribute.
 
-| TODO: add information about how to use non-YouTube video sources
+To use non-YouTube video sources, provide a URL in place of the YouTube ID, e.g.::
+
+    \edXvideo{A sample video}{https://my_video_server/a_video.mp4}
 
 A video element may be within a sequential or vertical, placed in
-parallel with problem and text.
+parallel with problem and text.  A video element may also be placed inside a conditional.
+
+edXlti
+^^^^^^
+
+A LTI element embeds a third-party LTI provider tool, hosted on an external website, in the course.
+
+Example::
+
+    \edXlti{Textbook: Classical Resonnance}{http://textbook_lti_provider}{the_lti_id}[open_in_a_new_page="false" custom_page=Introduction custom_section=2 url_name="The_Textbook"]
+
+The first argument specifies the URL for the LTI provider site.
+
+The second argument specifies the ID of the LTI tool, as defined in
+the "lti_passports" entry of the edX policy file for the course.  That
+entry is used to define authentication information for LTI tool
+access, e.g. the consumer key.  For example::
+
+        ...
+
+        "lti_passports": [
+            "the_lti_id:__consumer_key__:a_secret_key"
+        ], 
+
+	...
+
+Optional arguments which may be specified include "open_in_a_new_page"
+and "custom_*" keys.  Custom keys are transformed by latex2edx into
+the "custom_parameters" field expected in edX XML.
+
+For example, the above edXlti statement compiles to produce this XML:
+
+      <lti display_name="Textbook: Classical Resonnance" launch_url="http://textbook_lti_provider" lti_id="the_lti_id" open_in_a_new_page="false" url_name="The_Textbook" custom_parameters="[&quot;page=Introduction&quot;, &quot;section=2&quot;]"/>
+
+External LTI tools can provide rich interactions, including
+interactive assessments which return grades to the edX instance.
+However, this comes at the cost of making course content less
+portable, and requiring maintenance of the separate LTI tool.  Also,
+learner activity data gathered by the LTI tool are not included in the
+edX tracking logs, and thus may be inaccessible for analysis.
 
 edXdiscussion
 ^^^^^^^^^^^^^

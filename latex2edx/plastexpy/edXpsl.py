@@ -103,6 +103,11 @@ class edXvertical(EdXverticalStar):
 class edXrandomize(Base.Environment):  # block of text to be hidden by default, but with clickable "show"
     args = 'self'
 
+class edXconditional(MyBaseEnvironment):
+    macroName = 'edXconditional'
+    args = '{ display_name } [ attrib_string:str ] self'
+
+
 class edXabox(MyBaseCommand):
     args = 'self'
 
@@ -117,6 +122,11 @@ class edXbr(Base.Command):
 
 class edXvideo(Base.Command):
     args = '{ display_name } { youtube } [ attrib_string ] self'
+    # args = 'self'
+
+
+class edXlti(Base.Command):
+    args = '{ display_name } { launch_url } { lti_id } [ attrib_string ] self'
     # args = 'self'
 
 
@@ -234,7 +244,7 @@ class index(Base.Command):
 
 
 class href(Base.Command):
-    args = '{ url } self'
+    args = '{ url } { self }'
 
 
 class textwidth(Base.Command):

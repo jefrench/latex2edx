@@ -87,7 +87,7 @@ class latex2edx(object):
     '''
 
     DescriptorTags = ['course', 'chapter', 'sequential', 'vertical', 'html', 'problem', 'video',
-                      'conditional', 'combinedopenended', 'randomize', 'discussion']
+                      'conditional', 'combinedopenended', 'randomize', 'discussion', 'lti']
 
     def __init__(self,
                  fn,
@@ -109,6 +109,7 @@ class latex2edx(object):
                  xml_only=False,
                  units_only=False,
                  popup_flag=False,
+                 allow_dirs=False,
                  ):
         '''
         extra_xml_filters = list of functions acting on XML, applied to XHTML
@@ -144,7 +145,9 @@ class latex2edx(object):
         self.xml_only = xml_only
         self.units_only = units_only
         self.popup_flag = popup_flag
+        self.verbose = verbose
         self.the_xml = None
+        self.allow_dirs = allow_dirs
 
         if output_fn is None or not output_fn:
             if fn.endswith('.tex'):
@@ -167,6 +170,8 @@ class latex2edx(object):
                             self.process_dndtex,  # must come before process_include
                             self.process_include,
                             self.process_includepy,
+                            self.process_video,
+                            self.process_lti,
                             self.process_general_hint_system,
                             self.check_all_python_scripts,
                             self.handle_policy_settings,
@@ -259,7 +264,7 @@ class latex2edx(object):
         self.xhtml2xbundle()
         self.xb.save(self.output_fn)
         print "xbundle generated (%s): " % self.output_fn
-        tags = ['chapter', 'sequential', 'problem', 'html', 'video']
+        tags = ['chapter', 'sequential', 'problem', 'html', 'video', 'lti']
         for tag in tags:
             print "    %s: %d" % (tag, len(self.xb.course.findall('.//%s' % tag)))
         if self.xml_only:
@@ -465,8 +470,12 @@ class latex2edx(object):
         '''
         if self.section_only:
             return
+        if self.units_only:
+            return
         # EVH: Build course map from tree.
         course = tree.find('.//course')
+        if course is None:
+            return
         cnumber = course.get('number')
         # EVH: Navigate course and set a 'tmploc' attribute with location for desired items
         maplist = []  # ['loc. str.']
@@ -663,10 +672,19 @@ class latex2edx(object):
             paref = tocref.getparent()
             paref.text += tocref.tail
             paref.remove(tocref)
-            while paref.tag not in ['html', 'problem']:
+            while paref.tag not in ['html', 'problem', 'vertical']:
                 paref = paref.getparent()
+                pareftag = paref.tag
             # EVH: Prepend letter to identify content type
-            if paref.tag == 'problem':
+            if pareftag == 'vertical':
+                parind = []
+                for i, child in enumerate(paref):
+                    if child.tag in ['html', 'problem']:
+                        parind = min(parind, i)
+                    if child.tag == 'problem':
+                        pareftag = 'problem'
+                paref = paref[parind]
+            if pareftag == 'problem':
                 parefname = 'P' + paref.get('display_name')
                 oldtag = paref.get('measureable_outcomes')
                 tagname = tagref
@@ -867,6 +885,8 @@ class latex2edx(object):
         for table in tree.xpath('.//table[@class="equation"]|'
                                 './/table[@class="eqnarray"]'):
             locstr = table.attrib.pop('tmploc')
+            if not locstr:
+                continue
             locref = mapdict[locstr][2]
             if chapref != locref.split('.')[0]:
                 chapref = locref.split('.')[0]
@@ -877,6 +897,20 @@ class latex2edx(object):
                 for td in tr.findall('.//td'):
                     if td.get('class') == 'eqnnum':
                         eqnnumcell = td
+                        # EVH: Use plasTeX output to handle equation numbering
+                        eqncnt += 1
+                        if chapref == '0':
+                            eqnnum = '{}'.format(eqncnt)
+                        else:
+                            eqnnum = '{}.{}'.format(chapref, eqncnt)
+                        tr.remove(eqnnumcell)
+                        eqnnumcell = etree.SubElement(
+                            tr, "td", attrib=eqnnumcell.attrib)
+                        eqnnumcell.text = '({})'.format(eqnnum)
+                        eqnnumsty = eqnnumcell.get('style')
+                        eqnnumsty = re.sub('text-align:[a-zA-Z]+;', '', eqnnumsty)
+                        eqnnumsty += ';text-align:right'
+                        eqnnumcell.set('style', eqnnumsty)
                     elif td.text is not None:
                         eqncontent = td.text
                         if re.search(r'\\label\{(.*?)\}',
@@ -887,14 +921,13 @@ class latex2edx(object):
                                                 eqncontent)
                             td.text = eqncontent
                 if len(eqnlabel) != 0:
+                    # NOTE: EVH 2015-07-24 find a better way to handle labels
+                    # to unnumbered equations
+                    if eqnnumcell is None:
+                        eqnnum = 'NaN'
                     eqnlabel = eqnlabel[0]
-                    eqncnt += 1
                     eqnlabel = eqnlabel.replace(' ', '')
-                    if chapref == '0':
-                        eqnnum = '{}'.format(eqncnt)
-                    else:
-                        eqnnum = '{}.{}'.format(chapref, eqncnt)
-                    eqndict[eqnlabel] = '({})'.format(eqnnum)
+                    eqndict[eqnlabel] = '{}'.format(eqnnum)
                     # EVH: Set id for linking if pop-up flag is False
                     tr.set('id', 'eqn{}'.format(eqnnum.replace('.', 'p')))
                     eqnattrib[eqnlabel] = {
@@ -931,33 +964,6 @@ class latex2edx(object):
                     eqnattrib[eqnlabel]['onClick'] = (
                         "return newWindow({}, \'Equation {}\');".
                         format(htmlstr, eqnnum))
-                # replace the necessary subelements to get desired behavior
-                if table.get('class') == 'equation':
-                    # Only one 'tr' element in equation table, need to add 'td'
-                    tr.clear()
-                    eqncell = etree.SubElement(
-                        tr, "td", attrib={
-                            'style': ("width:80%;vertical-align:middle;"
-                                      "text-align:center;border-style:hidden"),
-                            'class': "equation"})
-                    eqncell.text = eqncontent
-                    eqnnumcell = None
-                if eqnnumcell is None:
-                    eqnnumcell = etree.SubElement(
-                        tr, "td", attrib={
-                            'style': ("width:20%;vertical-align:middle;"
-                                      "text-align:left;border-style:hidden"),
-                            'class': "eqnnum"})
-                else:
-                    tr.remove(eqnnumcell)
-                    eqnnumcell = etree.SubElement(
-                        tr, "td", attrib=eqnnumcell.attrib)
-                if len(eqnlabel) != 0:
-                    eqnnumcell.text = '({})'.format(eqnnum)
-                    eqnnumsty = eqnnumcell.get('style')
-                    eqnnumsty = re.sub('text-align:[a-zA-Z]+;', '', eqnnumsty)
-                    eqnnumsty += ';text-align:right'
-                    eqnnumcell.set('style', eqnnumsty)
 
         # EVH: Build keymap dictionary for keywords specified by the \index
         # command
@@ -1110,7 +1116,7 @@ class latex2edx(object):
             atin.set('value', data['label'])
             atin.set('type', 'button')
             atin.set('onclick', '%s();' % smfn)
-            
+
             for attrib in special_attribs:
                 data.pop(attrib)
 
@@ -1180,7 +1186,7 @@ class latex2edx(object):
         p = xml.getparent()
         todrop = xml
         where2add = xml
-        if p.tag == 'p' and not p.text.strip():	 # if in empty <p> then remove that <p>
+        if p.tag == 'p' and not p.text.strip() and len(p) == 1:	 # if in empty <p> then remove that <p>
             todrop = p
             where2add = p
             p = p.getparent()
@@ -1219,6 +1225,35 @@ class latex2edx(object):
         '''
         for edxxml in tree.findall('.//edxxml'):
             self.remove_parent_p(edxxml)
+
+    def process_video(self, tree):
+        '''
+        If the "youtubeid" begins with "http" then make the video an html5 video.
+        '''
+        for video in tree.findall('.//video'):
+            ytid = video.get('youtube_id_1_0')
+            if ytid.startswith('http'):
+                video.set('html5_sources', '["%s"]' % ytid)
+                video.set('youtube_id_1_0', '')
+                vsource = etree.Element('source')
+                vsource.set('src', ytid)
+                video.append(vsource)
+
+    def process_lti(self, tree):
+        '''
+        For LTI elements, any custom_* attributes should be moved into a special single
+        "custom_parameters" attribute.
+        '''
+        for lti in tree.findall('.//lti'):
+            cplist = []
+            for key, val in lti.attrib.items():
+                if key.startswith('custom_'):
+                    cplist.append("%s=%s" % (key[7:], val))  # strip "custom_" prefix
+                    lti.attrib.pop(key)
+            if cplist:
+                lti.set('custom_parameters', '[%s]' % ', '.join(['"' + x + '"' for x in cplist]))
+            if self.verbose:
+                print "    lti %s, cp=%s" % (lti, lti.get('custom_parameters'))
 
     def process_showhide(self, tree):
         for showhide in tree.findall('.//edxshowhide'):
@@ -1525,18 +1560,23 @@ class latex2edx(object):
         Use tag if provided.
         '''
         map = {'"\':<>': '',
-               ',/().;=+ ': '_',
-               '/': '__',
+               ',().;=+ ': '_',
                '&': 'and',
                '[': 'LB_',
                ']': '_RB',
-               '?# ': '_',
+               '?#* ': '_',
                }
+        if not self.allow_dirs:
+            map['/'] = '_'
         if not s:
             s = tag
         for m, v in map.items():
             for ch in m:
                 s = s.replace(ch, v)
+        if self.allow_dirs:
+            # Have to do this after the rest of the mapping, as we don't want
+            # ': to turn into nothing (ordering in dictionary is not guaranteed)
+            s = s.replace('/', ':')
         if s in self.URLNAMES and not s.endswith(tag):
             s = '%s_%s' % (tag, s)
         while s in self.URLNAMES:
@@ -1572,7 +1612,8 @@ class latex2edx(object):
         '''
         Convert attrib_string in <problem>, <chapter>, etc. to attributes, intelligently.
         '''
-        TAGS = ['problem', 'chapter', 'sequential', 'vertical', 'course', 'html', 'video', 'discussion', 'edxdndtex']
+        TAGS = ['problem', 'chapter', 'sequential', 'vertical', 'course', 'html', 'video', 'discussion', 'edxdndtex',
+                'conditional', 'lti']
         for tag in TAGS:
             for elem in xml.findall('.//%s' % tag):
                 self.do_attrib_string(elem)
@@ -1656,6 +1697,11 @@ def CommandLine():
                       dest="popups",
                       default=False,
                       help="enable equation and figure popup windows on clicking their references",)
+    parser.add_option("--allow-directories",
+                      action="store_true",
+                      dest="allow_dirs",
+                      default=False,
+                      help="allow subdirectory structure in the xml output",)
     (opts, args) = parser.parse_args()
 
     if len(args) < 1:
@@ -1680,5 +1726,6 @@ def CommandLine():
                   xml_only=opts.xml_only,
                   units_only=opts.units_only,
                   popup_flag=opts.popups,
+                  allow_dirs=opts.allow_dirs,
                   )
     c.convert()
