@@ -29,7 +29,7 @@ from abox import split_args_with_quoted_strings
 DEFAULT_CONFIG = {
     'problem_default_attributes': {
         'showanswer': 'closed',
-        'rerandomize': 'never',
+        'rerandomize': 'onreset',
     }
 }
 
@@ -582,8 +582,7 @@ class latex2edx(object):
                 # TODO: Find example and investigate how to refine (as above)
                 fig.set('id', 'fig{}'.format(fignum))
                 figattrib[figlabel] = {
-                    'href': '{}#fig{}'.format(mapdict[locstr][0], fignum),
-                    'onClick': 'location.reload()'}
+                    'href': '{}/#fig{}'.format(mapdict[locstr][0], fignum)}
                 if self.popup_flag:
                     imgsrcs = []
                     for img in fig.findall('.//img'):
@@ -932,9 +931,8 @@ class latex2edx(object):
                     # EVH: Set id for linking if pop-up flag is False
                     tr.set('id', 'eqn{}'.format(eqnnum.replace('.', 'p')))
                     eqnattrib[eqnlabel] = {
-                        'href': '{}#eqn{}'.format(mapdict[locstr][0],
-                                                  eqnnum.replace('.', 'p')),
-                        'onClick': 'location.reload()'}
+                        'href': '{}/#eqn{}'.format(mapdict[locstr][0],
+                                                   eqnnum.replace('.', 'p'))}
                 if self.popup_flag and len(eqnlabel) != 0:
                     eqnattrib[eqnlabel]['href'] = 'javascript: void(0)'
                     eqntablecontent = (etree.tostring(
@@ -1259,62 +1257,72 @@ class latex2edx(object):
 
     def process_showhide(self, tree):
         for showhide in tree.findall('.//edxshowhide'):
-            desc = showhide.get('description', '')
-            oneup = showhide.getparent()
-            newsh = etree.SubElement(oneup, 'div', {'class': 'hideshowbox'})
-            sub1 = etree.SubElement(newsh, 'h4',
-                                    {'onclick': 'hideshow(this);',
-                                     'style': 'margin: 0px'})
+            #remove_outside_p(showhide)
+            desc = showhide.get('description','')
+            oneup=showhide.getparent()
+            newsh = etree.SubElement(oneup,'div')
+            newsh.set('class','hideshowbox')
+            sub1 = etree.SubElement(newsh,'h4')
+            sub1.set('onclick',"hideshow(this);")
             sub1.text = desc
-            etree.SubElement(sub1, 'span',
-                             {'class': 'icon-caret-down toggleimage'})
+            subsub1 = etree.SubElement(sub1,'img')
+            subsub1.set('src',"/static/js/down.png")
+            subsub1.set('class',"toggleimage")
             newsh.append(showhide)
-            showhide.tag = 'div'  # change edxshowhide tag
-            showhide.attrib.pop('description')  # remove description
-            showhide.set('class', 'hideshowcontent')
-            sub2 = etree.SubElement(newsh, 'p',
-                                    {'class': 'hideshowbottom',
-                                     'onclick': 'hideshow(this);',
-                                     'style': 'margin: 0px'})
-            subsub2 = etree.SubElement(sub2, 'a',
-                                       {'href': 'javascript: {return false;}'})
-            subsub2.text = 'Show'
+            showhide.tag = 'div'
+            #showhide.attrib.pop('id')  #can remove this if id removed from showhide elements in plastex
+            showhide.attrib.pop('description')
+            showhide.set('class','hideshowcontent')
+            sub2 = etree.SubElement(newsh,'p')
+            sub2.set('class','hideshowbottom')
+            sub2.set('onclick',"hideshow(this);")
+            subsub2 = etree.SubElement(sub2,'a')
+            subsub2.set('href',"javascript: {return false;}")
+            subsub2.text='Show'
             par = newsh.getparent()
             while (par.tag != 'html') and (par.tag != 'problem'):
                 par = par.getparent()
                 if par.tag == 'vertical' or par.tag == 'sequential':
-                    raise Exception("Must use showhide inside html or "
-                                    "problem element")
+                    raise Exception("Muse use showhide inside html or problem element")
                     break
-            scriptforsh = etree.Element('SCRIPT',
-                                        {'type': 'text/javascript',
-                                         'src': '/static/latex2edx.js'})
-            styleforsh = etree.Element('LINK',
-                                       {'type': 'text/css',
-                                        'rel': 'stylesheet',
-                                        'href': '/static/latex2edx.css'})
-            if len(par.findall('.//SCRIPT[@src="/static/latex2edx.js"]')) == 0:
+            scriptforsh = etree.Element('SCRIPT')
+            scriptforsh.set('type','text/javascript')
+            scriptforsh.set('src','/static/js/showhidescript.js')
+            if len(par.findall('.//SCRIPT'))!= 0:
+                scriptcount = 0
+                for script in par.findall('.//SCRIPT'):
+                    if script.get('src','') == scriptforsh.get('src',''):
+                        scriptcount += 1
+                if scriptcount ==0:
+                    par.append(scriptforsh)
+            else:
                 par.append(scriptforsh)
-                par.append(styleforsh)
-                staticdir = self.output_dir / 'static'
-                if not os.path.exists(staticdir):
-                    if not os.path.exists(self.output_dir):
-                        os.mkdir(self.output_dir)
-                    os.mkdir(staticdir)
-                if not os.path.exists(staticdir / 'latex2edx.js'):
-                    l2ejs = pkg_resources.resource_filename(__name__,
-                                                            'latex2edx.js')
-                    cmd = 'cp {} {}/'.format(l2ejs, staticdir)
-                    print '----> Copying showhide JavaScript: {}'.format(cmd)
-                    sys.stdout.flush()
-                    os.system(cmd)
-                if not os.path.exists(staticdir / 'latex2edx.css'):
-                    l2ecss = pkg_resources.resource_filename(__name__,
-                                                             'latex2edx.css')
-                    cmd = 'cp {} {}/'.format(l2ecss, staticdir)
-                    print '----> Copyting showhide CSS: {}'.format(cmd)
-                    sys.stdout.flush()
-                    os.system(cmd)
+    # def process_showhide(tree):
+    #     for showhide in tree.findall('.//edxshowhide'):
+    #         shid = showhide.get('id')
+    #         if shid is None:
+    #             print "Error: edXshowhide must be given an id argument.  Aborting."
+    #             raise Exception
+    #         print "---> showhide %s" % shid
+    #         # jscmd = "javascript:toggleDisplay('%s', 'hide', 'show')" % shid
+    #         jscmd = "javascript:$('#%s').toggle();" % shid
+
+    #         shtable = etree.Element('table')
+    #         showhide.addnext(shtable)
+
+    #         desc = showhide.get('description', '')
+    #         shtable.set('class', "wikitable collapsible collapsed")
+    #         shdiv = etree.XML('<tbody><tr><th> %s [<a onclick="%s" href="javascript:void(0);" id="%sl">show</a>]</th></tr></tbody>' % (desc, jscmd, shid))
+    #         shtable.append(shdiv)
+
+    #         tr = etree.SubElement(shdiv, 'tr')
+    #         tr.set('id', shid)
+    #         tr.set('style', 'display:none')
+    #         tr.append(showhide)	 # move showhide to become td of table
+    #         showhide.tag = 'td'
+    #         showhide.attrib.pop('id')
+    #         showhide.attrib.pop('description')
+
 
     def process_include(self, tree, do_python=False):
         '''
@@ -1705,15 +1713,10 @@ def CommandLine():
     fn = args[0]
 
     config = DEFAULT_CONFIG
-    extra_xml_filters = []
     # load local configuration file if available
     if os.path.exists(opts.config_file):
-        import imp
-        # prepend the config file's directory to the path to allow local imports inside it
-        sys.path.insert(0, os.path.dirname(opts.config_file))
-        cf = imp.load_source('config_file', opts.config_file)
-        config.update(getattr(cf, 'local_config', {}))
-        extra_xml_filters.extend(getattr(cf, 'extra_xml_filters', []))
+        lc = __import__(opts.config_file, fromlist=['local_config'])
+        config.update(lc.local_config)
 
     c = latex2edx(fn, verbose=opts.verbose, output_fn=opts.output_fn,
                   output_dir=opts.output_dir,
@@ -1726,6 +1729,5 @@ def CommandLine():
                   units_only=opts.units_only,
                   popup_flag=opts.popups,
                   allow_dirs=opts.allow_dirs,
-                  extra_xml_filters=extra_xml_filters,
                   )
     c.convert()

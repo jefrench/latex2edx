@@ -304,7 +304,10 @@ class AnswerBox(object):
                     self.copy_attrib(abargs, 'rows', tl)
                     self.copy_attrib(abargs, 'cols', tl)
                 else:
-                    tl = etree.Element('textline')
+                    if 'feqin' in abargs:
+                        tl = etree.Element('formulaequationinput')
+                    else:
+                        tl = etree.Element('textline')
                     self.copy_attrib(abargs, 'size', tl)
                 tl.set('correct_answer', ans)
                 self.copy_attrib(abargs, 'trailing_text', tl)
